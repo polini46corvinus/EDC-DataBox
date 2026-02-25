@@ -5,9 +5,10 @@ Created on Tue Feb 24 19:40:04 2026
 """
 
 #--------------# Prerequisites
-# Python   3.14.2 (or higher)
-# Pandas   2.3.3 (or higher)
-# Numpy    2.4.0 (or higher)
+# Python         3.14.2 (or higher)
+# Numpy          2.4.0 (or higher)
+# Pandas         2.3.3 (or higher)
+# Customtkinter  5.2.2 (or higher)
 
 #--------------# Libraries
 import tkinter as tk
@@ -16,8 +17,11 @@ from tkinter import messagebox as mb
 from threading import Thread
 
 #--------------# Globals
-windowGeometry="500x500+1200+500"
+windowGeometry="500x500+1200+300"
 windowTitle="EDC DataBox"
+
+#--------------# Globals
+#color codes: #EBEBEB #0A2239 #3B8ED0 #BFBFBF
 
 #--------------# Initialization
 try: 
@@ -50,7 +54,16 @@ def button_function():
     print("button pressed")
 
 # Use CTkButton instead of tkinter Button
-button = ctk.CTkButton(root, text="CTkButton", command=button_function)
-button.place(relx=0.5, rely=0.5, anchor="center")
+button_loadFile1 = ctk.CTkButton(root, text="Fájl betöltése", command=button_function)
+button_loadFile1.place(x=60, y=10)
+button_loadFile2 = ctk.CTkButton(root, text="Fájl betöltése", command=button_function)
+button_loadFile2.place(x=60, y=40)
+
+blueFrame = ctk.CTkFrame(master=root, width=40, height=500, fg_color="#0A2239", corner_radius=0)
+blueFrame.place(x=0, y=0)
+
+frame = ctk.CTkFrame(master=root, width=200, height=200, fg_color="#BFBFBF")
+frame.place(x=60, y=100)
+
 
 root.mainloop()
