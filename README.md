@@ -6,3 +6,4 @@ Ez a célszoftver adatelőkészítési és adategyesítési funkciókat lát el.
   * Tkinter (része a Python-csomagnak)
 * Pandas 2.3.3 (vagy újabb)
 * Numpy 2.4.0 (vagy újabb)
+* Customtkinter 5.2.2 (vagy újabb)
