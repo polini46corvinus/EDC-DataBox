@@ -7,3 +7,4 @@ Ez a célszoftver adatelőkészítési és adategyesítési funkciókat lát el.
 * Numpy 2.4.0 (vagy újabb)
 * Pandas 2.3.3 (vagy újabb)
 * Customtkinter 5.2.2 (vagy újabb)
+* Pillow 12.1.1 (vagy újabb)
