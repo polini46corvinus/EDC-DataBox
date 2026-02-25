@@ -23,29 +23,34 @@ windowTitle="EDC DataBox"
 try: 
     import numpy as np
     import pandas as pd
+    import customtkinter as ctk
 except Exception as ex:
     import subprocess
-    if ("No module named 'numpy'" in str(ex)) or ("No module named 'pandas'" in str(ex)):
-        if "No module named 'numpy'" in str(ex):
-            if mb.askyesno(windowTitle,f"Hiba:\n{ex}\n\nLehet, hogy nincs telepítve a numpy.\nSzeretnéd most telepíteni?"):
-                subprocess.call('start cmd /k "pip install numpy & echo. & echo A telepítés befejeződött & echo Zárd be ezt az ablakot, majd futtasd újra az EDC DataBox-ot!"', shell=True)
-        if "No module named 'pandas'" in str(ex):
-            if mb.askyesno(windowTitle,f"Hiba:\n{ex}\n\nLehet, hogy nincs telepítve a pandas.\nSzeretnéd most telepíteni?"):
-                subprocess.call('start cmd /k "pip install pandas & echo. & echo A telepítés befejeződött & echo Zárd be ezt az ablakot, majd futtasd újra az EDC DataBox-ot!"', shell=True)
+    if ("No module named 'numpy'" in str(ex)) or ("No module named 'pandas'" in str(ex)) or ("No module named 'customtkinter'" in str(ex)):
+        if mb.askyesno(windowTitle,f"Hiba:\n{ex}\n\nLehet, hogy nincs telepítve valamelyik bővítőcsomag.\nSzeretnéd egyszerre mindegyiket telepíteni?"):
+            subprocess.call('start cmd /k "pip install numpy & pip install pandas & pip install customtkinter & echo. & echo A telepítés befejeződött & echo Zárd be ezt az ablakot, majd futtasd újra az EDC DataBox-ot!"', shell=True)
     else:
-        mb.showerror(windowTitle,f"Hiba történt valamely bővítőcsomag betöltésekor:\n{ex}")
+        mb.showerror(windowTitle,f"Hiba történt valamely bővítőcsomag betöltésekor:\n{ex}\nKérlek, telepítsd manuálisan!")
     exit()
-
 
 #--------------# Functions
 
- 
+
 
 #--------------# UI items
-root = tk.Tk()
+ctk.set_appearance_mode("light")
+ctk.set_default_color_theme("blue")
+
+root = ctk.CTk()
 root.title(windowTitle)
 root.geometry(windowGeometry)
 root.resizable(False, False)
 
+def button_function():
+    print("button pressed")
+
+# Use CTkButton instead of tkinter Button
+button = ctk.CTkButton(root, text="CTkButton", command=button_function)
+button.place(relx=0.5, rely=0.5, anchor="center")
 
 root.mainloop()
