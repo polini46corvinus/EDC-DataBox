@@ -8,3 +8,6 @@ Ez a célszoftver adatelőkészítési és adategyesítési funkciókat lát el.
 * Pandas 2.3.3 (vagy újabb)
 * Customtkinter 5.2.2 (vagy újabb)
 * Pillow 12.1.1 (vagy újabb)
+* Openpyxl 3.1.5 (vagy újabb)
+
+![Image](https://github.com/user-attachments/assets/efafe18c-b03a-4f55-b8e6-a092628ee841)
