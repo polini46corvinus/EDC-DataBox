@@ -24,11 +24,10 @@ warnings.filterwarnings('ignore', category=UserWarning, module='openpyxl')
 #--------------# Globals
 windowGeometry="800x600+1000+200"
 windowTitle="EDC DataBox v0.1"
-data1=[]
-data2=[]
-data3=[]
-dataoutput=[]
-locations=[]
+data1=[] # branches_2025_anonym.xlsx
+data2=[] # branches_anonym.xlsx
+data3=[] # companies_anonym.xlsx
+locations=[] # to be populated by function getLocations
 #color codes: #EBEBEB #1D283E #1F538D #BFBFBF #E7E7E7
 
 
@@ -51,7 +50,7 @@ except Exception as ex:
 # %%
 #--------------# Functions
 def cleanDf(df, mode):
-    statusLabel.configure(text="Folyamatban: Adatbázisok előkészítése")
+    startProgress("Folyamatban: Adatbázisok előkészítése")
     if "Unnamed: 0" in df.columns: #drop unnamed index column from csvs
         df = df.drop("Unnamed: 0", axis=1)
     if mode=="branches": #else: keep all columns
@@ -61,7 +60,7 @@ def cleanDf(df, mode):
     renameCols(df) #removes apostrophe from column names starts and ends
     stripChar_From_StringCols(df, "'") #removes apostrophe from string values starts and ends
     replaceWhiteSpaces_In_StringCols(df)
-    df = df.replace("", np.nan) #replaces empty strings with np.nan
+    stopProgress()
     return df
 
 def renameCols(df): #removes apostrophe from column name starts and ends
@@ -78,7 +77,7 @@ def stripChar_From_StringCols(df, char):
 def replaceWhiteSpaces_In_StringCols(df):
     stringCols = (df.dtypes=="str") | (df.dtypes=="object")
     for i in df.columns[stringCols]:
-        dataconcat[i] = dataconcat[i].str.replace(r"\s+", " ", regex=True)
+        df[i] = df[i].str.replace(r"\s+", " ", regex=True)
     return df
 
 def getLocations():
@@ -104,6 +103,7 @@ def getLocations():
     hnt.columns=["Település","Irsz"]
     hnt_extras = hnt_extras.iloc[:,[0,2,3,5]] #selects extra cols for later use
     hnt_extras = hnt_extras[hnt_extras.iloc[:,0]!="Összesen"] #deletes last row "Összesen"
+    hnt_extras.columns = ["Település", "Jogállás", "Vármegye", "Járás"]
     posta = posta.iloc[:,[0,1]].drop_duplicates()
     posta.columns=["Irsz","Település"]
     bp_dict = {"0": "Budapest Margit-Sziget", "Margitsziget": "Budapest Margit-Sziget",
@@ -117,6 +117,7 @@ def getLocations():
         "XXII.": "Budapest 22. kerület", "XXIII.": "Budapest 23. kerület"}
     szotar = pd.DataFrame(bp_dict.items(), columns=["KER","new"])
     stripChar_From_StringCols(bp, " ")
+    stripChar_From_StringCols(hnt_extras, " ") #just in case
     bp = pd.merge(bp.iloc[:,[0,-1]], szotar, how="left", on="KER").drop_duplicates()
     bp = bp.drop("KER", axis=1)
     bp.columns=["Irsz","Település"]
@@ -137,7 +138,15 @@ def getLocations():
     locations = locations[locations["Irsz"]!="*"] #removes Budapest districts without zipcode distinction
     locations = locations[~((locations["Település"]=="Budapest") & (locations["Irsz"]==1007))] #removes one known bad value which already exists as "Budapest Margit-Sziget"
     locations["Település"] = locations["Település"].str.strip() #cleans all whitespaces, mostly from "posta" database
-    locations = locations.drop_duplicates().sort_values(by="Település").reset_index(drop=True)
+    locations["Irsz"] = locations["Irsz"].astype(str)
+    locations = pd.merge(locations, hnt_extras, on="Település", how="left") #adds extra information to all settlements
+    mask = locations["Település"].str.startswith("Budapest")
+    locations.loc[mask, ["Jogállás", "Vármegye", "Járás"]] = ["főváros", "Budapest", "Budapesti"]
+    locations = locations.drop_duplicates().sort_values(by="Irsz").reset_index(drop=True)
+    locations = locations.dropna() #removes one NaN value which was created by Irsz 1007 (Margit-Sziget)
+    
+    del mask
+        
     stopProgress()
     return locations
 
@@ -181,6 +190,19 @@ def stopProgress():
         mb.showerror(windowTitle,f"Hiba:\n{ex}\n")
     return
 
+def formatBranchesDataCols(data):
+    startProgress("Folyamatban: Branches fájl formázása")
+    data = data[data["Ország kód"]=="HU"].drop(["Cím típus kód", "Ország kód", "Ország"], axis="columns") #selects only hungarian entities and drops useless cols
+    stopProgress()
+    return data
+
+def formatCompaniesDataCols(data):
+    startProgress("Folyamatban: Companies formázása")
+    data = data.drop(["TEÁOR megnevezés", "KKV", "Járás", "Alapítás éve", "Utolsó mérleg dátuma", "Megye"], axis="columns")
+    data = data[data["Jogi státusz"]=="aktív"]
+    stopProgress()
+    return data
+
 def readFiles():
     startProgress("Folyamatban: Fájlok beolvasása")
     global data1
@@ -211,10 +233,14 @@ def readFiles():
     try:
         if len(data1)>0:
             data1 = cleanDf(data1, "branches")
+            data1 = formatBranchesDataCols(data1)
         if len(data2)>0:
             data2 = cleanDf(data2, "branches")
+            data2 = formatBranchesDataCols(data2)
         if len(data3)>0:
             data3 = cleanDf(data3, "companies")
+            data3 = formatCompaniesDataCols(data3)
+            button_saveButton.configure(state="normal")
     except Exception as ex:
         mb.showerror(windowTitle,f"Hiba:\n{ex}\n")
    
@@ -234,6 +260,54 @@ def checkboxEvent():
         button_loadFile2.configure(state="normal")
         label_loadFile2.configure(text_color="#000000")
     return
+
+def saveFile():
+    try:
+        button_saveButton.configure(state="disabled")
+        startProgress("Folyamatban: Fájl (output.csv) mentése")
+        global data1
+        global data2
+        global data3
+        #deb = pd.Series(pd.read_excel("debreceni crefok.xlsx").iloc[:,0])
+        #data1 = data1.loc[data1["Crefo szám"].isin(deb)]
+        #data2 = data2.loc[data2["Crefo szám"].isin(deb)]
+        if (len(data1)>0 and len(data2)>0):
+            dataconcat = pd.concat([data1, data2])
+            del data1, data2
+        elif len(data1)>0:
+            dataconcat = data1
+            del data1
+        elif len(data2)>0:
+            dataconcat = data2
+            del data2
+        
+        datamerge = pd.merge(dataconcat, data3, how="left", on="Crefo szám")
+        del dataconcat, data3
+        
+        datamerge = datamerge.drop(["Irányítószám_y", "Település_y", "Cím"], axis="columns")
+        datamerge = datamerge.replace(["NULL", np.nan],"")
+        datamerge = datamerge.rename(columns={"Irányítószám_x":"Irsz", "Település_x": "Település"})
+        datamerge = datamerge[datamerge["Irsz"]!=""]
+        datamerge["Irsz"] = datamerge["Irsz"].astype(str)
+        datamerge = pd.merge(datamerge, locations, on="Irsz", how="left")
+        datamerge = datamerge.drop("Település_y", axis="columns")
+        datamerge = datamerge.rename(columns={"Település_x": "Település"})
+        datamerge["Cím"] = datamerge["Irsz"].str.cat([datamerge["Település"], datamerge["Utca"], datamerge["Házszám"]], sep=",")
+        datamerge["Cím"] = datamerge["Cím"].str.strip(",")
+        datamerge = stripChar_From_StringCols(datamerge, " ")
+        datamerge = replaceWhiteSpaces_In_StringCols(datamerge)
+        datamerge = datamerge.drop(["Irsz", "Település", "Utca", "Házszám"], axis="columns")
+        datamerge = datamerge.drop_duplicates()
+        datamerge["Jogi forma"] = datamerge["Jogi forma"].replace("korlátolt felelősségű társaság (Kft.)", "Kft.")
+        datamerge["Jogi forma"] = datamerge["Jogi forma"].replace("Betéti társaság (Bt.)", "Bt.")
+        #datamerge.to_excel("debreceni szekhelyu cegek.xlsx", index=False)
+        datas = datamerge.head(100)
+        datamerge.to_csv("output.csv")
+        stopProgress()    
+    except Exception as ex:
+        mb.showerror(windowTitle,f"Hiba:\n{ex}\n")
+    return    
+
 
 # %%
 #--------------# UI items
@@ -310,26 +384,12 @@ button_startButton.place(x=100, y=400)
 button_helpButton = ctk.CTkButton(root, width=70, text="Segítség", command=helpFile)
 button_helpButton.place(relx=0.97, rely=0.97, anchor="se")
 
+button_saveButton = ctk.CTkButton(root, text="Mentés", state="disabled", command=lambda: Thread(target=saveFile).start())
+button_saveButton.place(x=100, y=430)
+
 # %%
 
 root.after(300, lambda: Thread(target=getLocations).start())
 root.mainloop()
 
 exit()
-
-deb = pd.Series(pd.read_excel("debreceni crefok.xlsx").iloc[:,0])
-data1 = data1.loc[data1["Crefo szám"].isin(deb)]
-data2 = data2.loc[data2["Crefo szám"].isin(deb)]
-dataconcat = pd.concat([data1, data2])
-dataconcat = stripChar_From_StringCols(dataconcat, " ")
-dataconcat = replaceWhiteSpaces_In_StringCols(dataconcat)
-dataconcat = dataconcat.drop_duplicates()
-datamerge = pd.merge(left=dataconcat, right=data3, how="left", on="Crefo szám")
-datamerge = datamerge.drop(["Cím típus kód", "Ország kód", "Irányítószám_y", "Település_y", "Cím"], axis="columns")
-datamerge["Irányítószám_x"] = datamerge["Irányítószám_x"].replace("NULL","")
-datamerge["Házszám"] = datamerge["Házszám"].fillna("")
-datamerge["Cím"] = datamerge["Irányítószám_x"]+" "+datamerge["Település_x"]+" "+datamerge["Utca"]+" "+datamerge["Házszám"]
-datamerge = stripChar_From_StringCols(datamerge, " ")
-datamerge = datamerge.drop(["Irányítószám_x", "Település_x", "Utca", "Házszám"], axis="columns")
-datamerge = datamerge.drop_duplicates()
-datamerge.to_excel("debreceni szekhelyu cegek.xlsx", index=False)
