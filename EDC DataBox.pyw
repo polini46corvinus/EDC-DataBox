@@ -23,10 +23,11 @@ warnings.filterwarnings('ignore', category=UserWarning, module='openpyxl')
 
 #--------------# Globals
 windowGeometry="800x600+1000+200"
-windowTitle="EDC DataBox v0.1"
+windowTitle="EDC DataBox v0.2"
 data1=[] # branches_2025_anonym.xlsx
 data2=[] # branches_anonym.xlsx
 data3=[] # companies_anonym.xlsx
+datamerge=[]
 locations=[] # to be populated by function getLocations
 #color codes: #EBEBEB #1D283E #1F538D #BFBFBF #E7E7E7
 
@@ -57,6 +58,7 @@ def cleanDf(df, mode):
         df = df.iloc[:,0:9] #enough to keep first 9 cols, last col should be "Házszám"
     if mode=="companies":
         df = df.iloc[:,0:12] #enough to keep first 12 cols, last col should be "Utolsó mérleg dátuma"
+        df["'Alapítás éve'"] = df["'Alapítás éve'"].fillna(0).astype(int) #fix for issue: missing values caused the whole column to be filled with nan
     renameCols(df) #removes apostrophe from column names starts and ends
     stripChar_From_StringCols(df, "'") #removes apostrophe from string values starts and ends
     replaceWhiteSpaces_In_StringCols(df)
@@ -139,6 +141,10 @@ def getLocations():
     locations = locations[~((locations["Település"]=="Budapest") & (locations["Irsz"]==1007))] #removes one known bad value which already exists as "Budapest Margit-Sziget"
     locations["Település"] = locations["Település"].str.strip() #cleans all whitespaces, mostly from "posta" database
     locations["Irsz"] = locations["Irsz"].astype(str)
+    locations["Irsz"] = locations["Irsz"].str.split("/").str[0] #removes bad value: "1172/1173"
+    locations["Irsz"] = locations["Irsz"].astype(int)
+    locations = locations[(locations["Irsz"] > 999) & (locations["Irsz"] < 10001)] #extra safety filter for bad values
+    locations["Irsz"] = locations["Irsz"].astype(str)
     locations = pd.merge(locations, hnt_extras, on="Település", how="left") #adds extra information to all settlements
     mask = locations["Település"].str.startswith("Budapest")
     locations.loc[mask, ["Jogállás", "Vármegye", "Járás"]] = ["főváros", "Budapest", "Budapesti"]
@@ -146,7 +152,7 @@ def getLocations():
     locations = locations.dropna() #removes one NaN value which was created by Irsz 1007 (Margit-Sziget)
     
     del mask
-        
+
     stopProgress()
     return locations
 
@@ -198,8 +204,8 @@ def formatBranchesDataCols(data):
 
 def formatCompaniesDataCols(data):
     startProgress("Folyamatban: Companies formázása")
-    data = data.drop(["TEÁOR megnevezés", "KKV", "Járás", "Alapítás éve", "Utolsó mérleg dátuma", "Megye"], axis="columns")
-    data = data[data["Jogi státusz"]=="aktív"]
+    data = data.drop(["TEÁOR megnevezés", "Járás", "Utolsó mérleg dátuma", "Megye"], axis="columns")
+    data = data[data["Jogi státusz"]=="aktív"] #filter only active companies
     stopProgress()
     return data
 
@@ -262,51 +268,60 @@ def checkboxEvent():
     return
 
 def saveFile():
-    try:
-        button_saveButton.configure(state="disabled")
-        startProgress("Folyamatban: Fájl (output.csv) mentése")
-        global data1
-        global data2
-        global data3
-        #deb = pd.Series(pd.read_excel("debreceni crefok.xlsx").iloc[:,0])
-        #data1 = data1.loc[data1["Crefo szám"].isin(deb)]
-        #data2 = data2.loc[data2["Crefo szám"].isin(deb)]
-        if (len(data1)>0 and len(data2)>0):
-            dataconcat = pd.concat([data1, data2])
-            del data1, data2
-        elif len(data1)>0:
-            dataconcat = data1
-            del data1
-        elif len(data2)>0:
-            dataconcat = data2
-            del data2
-        
-        datamerge = pd.merge(dataconcat, data3, how="left", on="Crefo szám")
-        del dataconcat, data3
-        
-        datamerge = datamerge.drop(["Irányítószám_y", "Település_y", "Cím"], axis="columns")
-        datamerge = datamerge.replace(["NULL", np.nan],"")
-        datamerge = datamerge.rename(columns={"Irányítószám_x":"Irsz", "Település_x": "Település"})
-        datamerge = datamerge[datamerge["Irsz"]!=""]
-        datamerge["Irsz"] = datamerge["Irsz"].astype(str)
-        datamerge = pd.merge(datamerge, locations, on="Irsz", how="left")
-        datamerge = datamerge.drop("Település_y", axis="columns")
-        datamerge = datamerge.rename(columns={"Település_x": "Település"})
-        datamerge["Cím"] = datamerge["Irsz"].str.cat([datamerge["Település"], datamerge["Utca"], datamerge["Házszám"]], sep=",")
-        datamerge["Cím"] = datamerge["Cím"].str.strip(",")
-        datamerge = stripChar_From_StringCols(datamerge, " ")
-        datamerge = replaceWhiteSpaces_In_StringCols(datamerge)
-        datamerge = datamerge.drop(["Irsz", "Település", "Utca", "Házszám"], axis="columns")
-        datamerge = datamerge.drop_duplicates()
-        datamerge["Jogi forma"] = datamerge["Jogi forma"].replace("korlátolt felelősségű társaság (Kft.)", "Kft.")
-        datamerge["Jogi forma"] = datamerge["Jogi forma"].replace("Betéti társaság (Bt.)", "Bt.")
-        #datamerge.to_excel("debreceni szekhelyu cegek.xlsx", index=False)
-        datas = datamerge.head(100)
-        datamerge.to_csv("output.csv")
-        stopProgress()    
-    except Exception as ex:
-        mb.showerror(windowTitle,f"Hiba:\n{ex}\n")
-    return    
+    if mb.showinfo(windowTitle, "Az output.csv fájl a feldolgozást követően a program gyökérkönyvtárában megtalálható.")=="ok":
+        try:
+            button_saveButton.configure(state="disabled")
+            startProgress("Folyamatban: Fájl (output.csv) mentése")
+            global data1
+            global data2
+            global data3
+            global datamerge
+            #deb = pd.Series(pd.read_excel("debreceni crefok.xlsx").iloc[:,0])
+            #data1 = data1.loc[data1["Crefo szám"].isin(deb)]
+            #data2 = data2.loc[data2["Crefo szám"].isin(deb)]
+            if (len(data1)>0 and len(data2)>0):
+                dataconcat = pd.concat([data1, data2])
+                del data1, data2
+            elif len(data1)>0:
+                dataconcat = data1
+                del data1
+            elif len(data2)>0:
+                dataconcat = data2
+                del data2
+            
+            datamerge = pd.merge(dataconcat, data3, how="left", on="Crefo szám")
+            del dataconcat, data3
+            
+            datamerge["Alapítás éve"] = datamerge["Alapítás éve"].fillna(0).astype(int) #lots of empty values were created due to merge
+            datamerge = datamerge.drop(["Irányítószám_y", "Település_y", "Cím"], axis="columns")
+            datamerge = datamerge.replace(["NULL", np.nan],"")
+            datamerge = datamerge.rename(columns={"Irányítószám_x":"Irsz", "Település_x": "Település"})
+            datamerge = datamerge[datamerge["Irsz"]!=""]
+            datamerge["Irsz"] = datamerge["Irsz"].astype(str)
+            datamerge = pd.merge(datamerge, locations, on="Irsz", how="left")
+            datamerge = datamerge.drop("Település_y", axis="columns")
+            datamerge = datamerge.rename(columns={"Település_x": "Település"})
+            datamerge["Cím"] = datamerge["Irsz"].str.cat([datamerge["Település"], datamerge["Utca"], datamerge["Házszám"]], sep=", ").str.rstrip(", ")
+            datamerge = stripChar_From_StringCols(datamerge, " ")
+            datamerge = replaceWhiteSpaces_In_StringCols(datamerge)
+            datamerge = datamerge.drop(["Irsz", "Utca", "Házszám"], axis="columns")
+            datamerge["Jogi forma"] = datamerge["Jogi forma"].replace("korlátolt felelősségű társaság (Kft.)", "Kft.")
+            datamerge["Jogi forma"] = datamerge["Jogi forma"].replace("Betéti társaság (Bt.)", "Bt.")
+            
+            #--------------# Custom filters
+            datamerge = datamerge.replace(["Ô", "ô", "Õ", "õ"], "ő")
+            
+            
+            #--------------# Save
+            datamerge = datamerge.drop_duplicates()
+            #datamerge.to_excel("debreceni szekhelyu cegek.xlsx", index=False)
+            datamerge.to_csv("output.csv")
+            stopProgress()    
+        except Exception as ex:
+            mb.showerror(windowTitle,f"Hiba:\n{ex}\n")
+        return datamerge
+    else:
+        return
 
 
 # %%
