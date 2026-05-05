@@ -10,4 +10,4 @@ Ez a célszoftver adatelőkészítési és adategyesítési funkciókat lát el.
 * Pillow 12.1.1 (vagy újabb)
 * Openpyxl 3.1.5 (vagy újabb)
 
-![Image](https://github.com/user-attachments/assets/efafe18c-b03a-4f55-b8e6-a092628ee841)
+![Image](https://github.com/user-attachments/assets/31f5565c-27ba-4410-9e85-e1cfc7625bb7)
