@@ -23,7 +23,7 @@ warnings.filterwarnings('ignore', category=UserWarning, module='openpyxl')
 
 #--------------# Globals
 windowGeometry="800x600+1000+200"
-windowTitle="EDC DataBox v0.2"
+windowTitle="EDC DataBox v0.3"
 data1=[] # branches_2025_anonym.xlsx
 data2=[] # branches_anonym.xlsx
 data3=[] # companies_anonym.xlsx
@@ -150,8 +150,19 @@ def getLocations():
     locations.loc[mask, ["Jogállás", "Vármegye", "Járás"]] = ["főváros", "Budapest", "Budapesti"]
     locations = locations.drop_duplicates().sort_values(by="Irsz").reset_index(drop=True)
     locations = locations.dropna() #removes one NaN value which was created by Irsz 1007 (Margit-Sziget)
-    
     del mask
+    
+    #v0.3 (2026.05.15.):
+    #Quick & dirty method to avoid data duplication during merging due to multiple settlement/zipcode pairs exist.
+    #Using the method of selecting the first element, we choose to keep the largest, then order by name
+    #Keep first settlement method:
+        #Creates a list of settlement labels, ordered by size ascending
+        #Creates a new col in locations and assigns an integer to each based on settlement size
+    settlementDict = {"község":0, "nagyközség":1, "város":2, "megyei jogú város":3, "megyeszékhely, megyei jogú város":4, "főváros":5}
+    locations["settlementSizeOrder"] = locations["Jogállás"].map(settlementDict)
+    locations = locations.sort_values(by=["Irsz", "settlementSizeOrder", "Település"], ascending=[True, False, True])
+    locations = locations.drop_duplicates(subset=["Irsz"],keep="first")
+    locations = locations.drop("settlementSizeOrder", axis="columns") #unnecessary from now on
 
     stopProgress()
     return locations
@@ -293,14 +304,16 @@ def saveFile():
             del dataconcat, data3
             
             datamerge["Alapítás éve"] = datamerge["Alapítás éve"].fillna(0).astype(int) #lots of empty values were created due to merge
-            datamerge = datamerge.drop(["Irányítószám_y", "Település_y", "Cím"], axis="columns")
+            datamerge = datamerge.drop(["Irányítószám_y", "Település_y", "Cím"], axis="columns") #deleting headquarters addresses
             datamerge = datamerge.replace(["NULL", np.nan],"")
             datamerge = datamerge.rename(columns={"Irányítószám_x":"Irsz", "Település_x": "Település"})
             datamerge = datamerge[datamerge["Irsz"]!=""]
             datamerge["Irsz"] = datamerge["Irsz"].astype(str)
             datamerge = pd.merge(datamerge, locations, on="Irsz", how="left")
-            datamerge = datamerge.drop("Település_y", axis="columns")
-            datamerge = datamerge.rename(columns={"Település_x": "Település"})
+            #datamerge = datamerge.drop("Település_y", axis="columns")
+            datamerge = datamerge.drop("Település_x", axis="columns") #instead of using original settlement names, use ones derived from locations variable
+            #datamerge = datamerge.rename(columns={"Település_x": "Település"})
+            datamerge = datamerge.rename(columns={"Település_y": "Település"})
             datamerge["Cím"] = datamerge["Irsz"].str.cat([datamerge["Település"], datamerge["Utca"], datamerge["Házszám"]], sep=", ").str.rstrip(", ")
             datamerge = stripChar_From_StringCols(datamerge, " ")
             datamerge = replaceWhiteSpaces_In_StringCols(datamerge)
