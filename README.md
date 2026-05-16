@@ -1,4 +1,4 @@
-# EDC DataBox
+# EDC DataBox v0.3
 Ez a célszoftver adatelőkészítési és adategyesítési funkciókat lát el.
 
 ## Előkövetelmények:
@@ -10,4 +10,4 @@ Ez a célszoftver adatelőkészítési és adategyesítési funkciókat lát el.
 * Pillow 12.1.1 (vagy újabb)
 * Openpyxl 3.1.5 (vagy újabb)
 
-![Image](https://github.com/user-attachments/assets/31f5565c-27ba-4410-9e85-e1cfc7625bb7)
+![Image](https://github.com/user-attachments/assets/85e73a67-41a8-47fd-b8f1-cb9dd7e10bb9)
