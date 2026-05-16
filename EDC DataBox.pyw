@@ -14,12 +14,15 @@ Created on Tue Feb 24 19:40:04 2026
 
 
 #--------------# Libraries
+import os
 import tkinter as tk
 from tkinter import messagebox as mb
 from tkinter import filedialog as fd
 from threading import Thread
 import warnings
 warnings.filterwarnings('ignore', category=UserWarning, module='openpyxl')
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+LIB_DIR = os.path.join(BASE_DIR, "lib")
 
 #--------------# Globals
 windowGeometry="800x600+1000+200"
@@ -87,9 +90,9 @@ def getLocations():
     startProgress("Folyamatban: Irányítószám adatbázis betöltése")
 
     try: #read zipcode xlsx files
-        hnt = pd.read_excel("lib/hnt_letoltes_2025.xlsx", sheet_name=1, skiprows=2)
-        hnt_extras = pd.read_excel("lib/hnt_letoltes_2025.xlsx", sheet_name=0, skiprows=2)
-        with pd.ExcelFile("lib/Iranyitoszam-Internet_uj.xlsx") as xls:
+        hnt = pd.read_excel(os.path.join(LIB_DIR, "hnt_letoltes_2025.xlsx"), sheet_name=1, skiprows=2)
+        hnt_extras = pd.read_excel(os.path.join(LIB_DIR, "hnt_letoltes_2025.xlsx"), sheet_name=0, skiprows=2)
+        with pd.ExcelFile(os.path.join(LIB_DIR, "Iranyitoszam-Internet_uj.xlsx")) as xls:
             posta = pd.read_excel(xls, sheet_name=0, skiprows=1)
             bp = pd.read_excel(xls, sheet_name=2)
             miskolc = pd.read_excel(xls, sheet_name=3)
@@ -175,7 +178,7 @@ def open_file_dialog(label):
 def helpFile():
     try:
         import subprocess
-        subprocess.call('start cmd /c lib\\dokumentacio.pdf', shell=True)
+        subprocess.call(f'start cmd /c "{os.path.join(LIB_DIR, "dokumentacio.pdf")}"', shell=True)
     except Exception as ex:
         mb.showwarning(windowTitle,f"Dokumentáció nem található!\n{ex}")
     return
@@ -279,7 +282,8 @@ def checkboxEvent():
     return
 
 def saveFile():
-    if mb.showinfo(windowTitle, "Az output.csv fájl a feldolgozást követően a program gyökérkönyvtárában megtalálható.")=="ok":
+    savePath = os.path.join(BASE_DIR,'output.csv')
+    if mb.showinfo(windowTitle, f"Az output.csv fájl a feldolgozást követően a program gyökérkönyvtárában megtalálható:\n{savePath}")=="ok":
         try:
             button_saveButton.configure(state="disabled")
             startProgress("Folyamatban: Fájl (output.csv) mentése")
@@ -328,7 +332,7 @@ def saveFile():
             #--------------# Save
             datamerge = datamerge.drop_duplicates()
             #datamerge.to_excel("debreceni szekhelyu cegek.xlsx", index=False)
-            datamerge.to_csv("output.csv")
+            datamerge.to_csv(savePath)
             stopProgress()    
         except Exception as ex:
             mb.showerror(windowTitle,f"Hiba:\n{ex}\n")
@@ -341,7 +345,7 @@ def saveFile():
 #--------------# UI items
 ctk.set_appearance_mode("light")
 try:
-    ctk.set_default_color_theme("./lib/dark-blue.json")
+    ctk.set_default_color_theme(os.path.join(LIB_DIR, "dark-blue.json"))
 except Exception as ex:
     mb.showerror(windowTitle,f"Hiba:\n{ex}\n")
     pass
@@ -358,7 +362,7 @@ label_edcLogo = ctk.CTkLabel(root, text="EDC DataBox", font=ctk.CTkFont(family="
 label_edcLogo.place(x=100, y=35)
 
 try: #logo placement
-    image_logo_label = ctk.CTkLabel(root, image=ctk.CTkImage(light_image=Image.open("./lib/logo"), size=(179,30)), text="")
+    image_logo_label = ctk.CTkLabel(root, image=ctk.CTkImage(light_image=Image.open(os.path.join(LIB_DIR, "logo")), size=(179,30)), text="")
     image_logo_label.place(relx=0.97, rely=0.03, anchor="ne")
 except Exception as ex:
     mb.showerror(windowTitle,f"Hiba:\n{ex}\n")
